@@ -1,0 +1,303 @@
+openapi: 3.1.0
+info:
+  title: Flight Booking API
+  description: RESTful API for managing flight bookings
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /api/v1/bookings:
+    post:
+      summary: Create a new booking
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+      responses:
+        '201':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      summary: List all bookings
+      operationId: getAllBookings
+      responses:
+        '200':
+          description: List of all bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/bookings/{bookingId}:
+    get:
+      summary: Get a booking by ID
+      operationId: getBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the booking
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/flights:
+    get:
+      summary: List all flights
+      operationId: getAllFlights
+      responses:
+        '200':
+          description: List of all flights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FlightResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    BookingRequest:
+      type: object
+      required:
+        - flightId
+        - passengerName
+        - passengerEmail
+        - seatCount
+      properties:
+        flightId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the flight to book
+        passengerName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Full name of the passenger
+        passengerEmail:
+          type: string
+          format: email
+          description: Email address of the passenger
+        seatCount:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Number of seats to book
+      example:
+        flightId: 1
+        passengerName: John Doe
+        passengerEmail: john.doe@example.com
+        seatCount: 2
+
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique booking identifier
+        flightId:
+          type: integer
+          format: int64
+          description: ID of the booked flight
+        flightNumber:
+          type: string
+          description: Flight number (e.g., BA123)
+        passengerName:
+          type: string
+          description: Full name of the passenger
+        passengerEmail:
+          type: string
+          format: email
+          description: Email address of the passenger
+        seatCount:
+          type: integer
+          format: int32
+          description: Number of seats booked
+        bookingTime:
+          type: string
+          format: date-time
+          description: Timestamp when the booking was created
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED]
+          description: Current booking status
+      example:
+        id: 550e8400-e29b-41d4-a716-446655440000
+        flightId: 1
+        flightNumber: BA123
+        passengerName: John Doe
+        passengerEmail: john.doe@example.com
+        seatCount: 2
+        bookingTime: '2026-07-07T14:30:00'
+        status: CONFIRMED
+
+    FlightResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique flight identifier
+        flightNumber:
+          type: string
+          description: Flight number (e.g., BA123)
+        origin:
+          type: string
+          description: Departure airport code
+        destination:
+          type: string
+          description: Arrival airport code
+        departureTime:
+          type: string
+          format: date-time
+          description: Scheduled departure time
+        arrivalTime:
+          type: string
+          format: date-time
+          description: Scheduled arrival time
+        totalSeats:
+          type: integer
+          format: int32
+          description: Total seat capacity
+        availableSeats:
+          type: integer
+          format: int32
+          description: Number of seats still available
+      example:
+        id: 1
+        flightNumber: BA123
+        origin: LHR
+        destination: JFK
+        departureTime: '2026-07-10T08:00:00'
+        arrivalTime: '2026-07-10T11:30:00'
+        totalSeats: 200
+        availableSeats: 198
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 problem detail
+
+    ValidationError:
+      type: object
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request — malformed body or missing parameters
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: error/bad-request
+            title: Bad Request
+            status: 400
+            detail: Malformed request body
+            timestamp: '2026-07-07T14:30:00'
+            path: /api/v1/bookings
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: error/booking-not-found
+            title: Booking Not Found
+            status: 404
+            detail: "Booking not found with id: 550e8400-e29b-41d4-a716-446655440000"
+            timestamp: '2026-07-07T14:30:00'
+            path: /api/v1/bookings/550e8400-e29b-41d4-a716-446655440000
+
+    Conflict:
+      description: Resource conflict (e.g., overbooking)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: error/overbooking
+            title: Overbooking
+            status: 409
+            detail: "Not enough seats available on flight BA123. Requested: 10, Available: 2"
+            timestamp: '2026-07-07T14:30:00'
+            path: /api/v1/bookings
+
+    ValidationError:
+      description: Validation failure — request body is structurally valid but semantically invalid
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ProblemDetail'
+              - type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ValidationError'
+          example:
+            type: error/validation
+            title: Validation Error
+            status: 422
+            detail: Validation failed
+            timestamp: '2026-07-07T14:30:00'
+            path: /api/v1/bookings
+            errors:
+              - field: passengerName
+                message: Passenger name must be between 2 and 100 characters
+              - field: passengerEmail
+                message: Invalid email format
+
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: error/internal-server-error
+            title: Internal Server Error
+            status: 500
+            detail: An unexpected error occurred
+            timestamp: '2026-07-07T14:30:00'
+            path: /api/v1/bookings

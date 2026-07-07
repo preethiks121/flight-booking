@@ -1,8 +1,9 @@
 package com.flightbooking.service;
 
-import com.flightbooking.dto.BookingRequest;
-import com.flightbooking.dto.BookingResponse;
-import com.flightbooking.dto.FlightResponse;
+import com.flightbooking.dto.gen.BookingRequest;
+import com.flightbooking.dto.gen.BookingResponse;
+import com.flightbooking.dto.gen.BookingResponse.StatusEnum;
+import com.flightbooking.dto.gen.FlightResponse;
 import com.flightbooking.exception.BookingNotFoundException;
 import com.flightbooking.exception.FlightNotFoundException;
 import com.flightbooking.exception.OverbookingException;
@@ -14,6 +15,7 @@ import com.flightbooking.repository.FlightRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +24,7 @@ public class BookingService {
 
     private final FlightRepository flightRepository;
     private final BookingRepository bookingRepository;
+    private final Object flightLock = new Object();
 
     public BookingService(FlightRepository flightRepository, BookingRepository bookingRepository) {
         this.flightRepository = flightRepository;
@@ -29,10 +32,10 @@ public class BookingService {
     }
 
     public BookingResponse createBooking(BookingRequest request) {
-        Flight flight = flightRepository.findById(request.getFlightId())
-                .orElseThrow(() -> new FlightNotFoundException(request.getFlightId()));
+        synchronized (flightLock) {
+            Flight flight = flightRepository.findById(request.getFlightId())
+                    .orElseThrow(() -> new FlightNotFoundException(request.getFlightId()));
 
-        synchronized (flight) {
             if (flight.getBookedSeats() + request.getSeatCount() > flight.getTotalSeats()) {
                 throw new OverbookingException(
                         flight.getFlightNumber(),
@@ -40,20 +43,20 @@ public class BookingService {
                         flight.getAvailableSeats());
             }
             flight.setBookedSeats(flight.getBookedSeats() + request.getSeatCount());
+
+            Booking booking = new Booking(
+                    UUID.randomUUID(),
+                    flight.getId(),
+                    request.getPassengerName(),
+                    request.getPassengerEmail(),
+                    request.getSeatCount(),
+                    LocalDateTime.now(),
+                    BookingStatus.CONFIRMED
+            );
+            bookingRepository.save(booking);
+
+            return toBookingResponse(booking, flight);
         }
-
-        Booking booking = new Booking(
-                UUID.randomUUID(),
-                flight.getId(),
-                request.getPassengerName(),
-                request.getPassengerEmail(),
-                request.getSeatCount(),
-                LocalDateTime.now(),
-                BookingStatus.CONFIRMED
-        );
-        bookingRepository.save(booking);
-
-        return toBookingResponse(booking, flight);
     }
 
     public BookingResponse getBooking(UUID id) {
@@ -87,8 +90,8 @@ public class BookingService {
         response.setPassengerName(booking.getPassengerName());
         response.setPassengerEmail(booking.getPassengerEmail());
         response.setSeatCount(booking.getSeatCount());
-        response.setBookingTime(booking.getBookingTime());
-        response.setStatus(booking.getStatus().name());
+        response.setBookingTime(booking.getBookingTime().atOffset(ZoneOffset.UTC));
+        response.setStatus(StatusEnum.valueOf(booking.getStatus().name()));
         return response;
     }
 
@@ -98,8 +101,8 @@ public class BookingService {
         response.setFlightNumber(flight.getFlightNumber());
         response.setOrigin(flight.getOrigin());
         response.setDestination(flight.getDestination());
-        response.setDepartureTime(flight.getDepartureTime());
-        response.setArrivalTime(flight.getArrivalTime());
+        response.setDepartureTime(flight.getDepartureTime().atOffset(ZoneOffset.UTC));
+        response.setArrivalTime(flight.getArrivalTime().atOffset(ZoneOffset.UTC));
         response.setTotalSeats(flight.getTotalSeats());
         response.setAvailableSeats(flight.getAvailableSeats());
         return response;

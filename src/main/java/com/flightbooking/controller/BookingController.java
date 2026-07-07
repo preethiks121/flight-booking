@@ -1,8 +1,8 @@
 package com.flightbooking.controller;
 
-import com.flightbooking.dto.BookingRequest;
-import com.flightbooking.dto.BookingResponse;
-import com.flightbooking.dto.FlightResponse;
+import com.flightbooking.dto.gen.BookingRequest;
+import com.flightbooking.dto.gen.BookingResponse;
+import com.flightbooking.dto.gen.FlightResponse;
 import com.flightbooking.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
